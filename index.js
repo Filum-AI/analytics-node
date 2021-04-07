@@ -76,6 +76,7 @@ class Analytics {
 
   identify (message, callback) {
     this._validate(message, 'identify')
+    message.event_name = 'Identify'
     this.enqueue('identify', message, callback)
     return this
   }
