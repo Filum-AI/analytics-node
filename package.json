@@ -1,13 +1,13 @@
 {
-  "name": "analytics-node",
-  "version": "4.0.1",
+  "name": "filum-node-sdk",
+  "version": "0.0.2",
   "description": "The hassle-free way to integrate analytics into any Node.js application",
   "license": "MIT",
-  "repository": "segmentio/analytics-node",
+  "repository": "Filum-AI/analytics-node",
   "author": {
-    "name": "Segment",
-    "email": "tools+npm@segment.com",
-    "url": "https://segment.com"
+    "name": "Filum AI",
+    "email": "hiep@filum.ai",
+    "url": "https://filum.ai"
   },
   "engines": {
     "node": ">=4"
@@ -26,14 +26,10 @@
   "keywords": [
     "analytics",
     "stats",
-    "segment.io",
-    "segmentio",
-    "segment",
     "client",
     "driver"
   ],
   "dependencies": {
-    "@segment/loosely-validate-event": "^2.0.0",
     "axios": "^0.21.1",
     "axios-retry": "^3.0.2",
     "lodash.isstring": "^4.0.1",
