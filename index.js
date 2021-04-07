@@ -2,7 +2,8 @@
 
 const assert = require('assert')
 const removeSlash = require('remove-trailing-slash')
-const looselyValidate = require('@segment/loosely-validate-event')
+// TODO
+// const looselyValidate = require('@segment/loosely-validate-event')
 const axios = require('axios')
 const axiosRetry = require('axios-retry')
 const ms = require('ms')
@@ -23,7 +24,7 @@ class Analytics {
    * @param {Object} [options] (optional)
    *   @property {Number} [flushAt] (default: 20)
    *   @property {Number} [flushInterval] (default: 10000)
-   *   @property {String} [host] (default: 'https://api.segment.io')
+   *   @property {String} [host] (default: 'http://event-api.filum.ml')
    *   @property {Boolean} [enable] (default: true)
    *   @property {Object} [axiosConfig] (optional)
    *   @property {Object} [axiosInstance] (default: axios.create(options.axiosConfig))
@@ -36,8 +37,8 @@ class Analytics {
 
     this.queue = []
     this.writeKey = writeKey
-    this.host = removeSlash(options.host || 'https://api.segment.io')
-    this.path = removeSlash(options.path || '/v1/batch')
+    this.host = removeSlash(options.host || 'http://event-api.filum.ml')
+    this.path = removeSlash(options.path || '/events')
     let axiosInstance = options.axiosInstance
     if (axiosInstance == null) {
       axiosInstance = axios.create(options.axiosConfig)
@@ -61,7 +62,8 @@ class Analytics {
   }
 
   _validate (message, type) {
-    looselyValidate(message, type)
+    // TODO
+    // looselyValidate(message, type)
   }
 
   /**
@@ -74,6 +76,7 @@ class Analytics {
 
   identify (message, callback) {
     this._validate(message, 'identify')
+    message.event_name = 'Identify'
     this.enqueue('identify', message, callback)
     return this
   }
@@ -166,40 +169,64 @@ class Analytics {
     }
 
     message = Object.assign({}, message)
-    message.type = type
+    message.event_type = type
     message.context = Object.assign({
       library: {
-        name: 'analytics-node',
+        name: 'filum-node-sdk',
         version
       }
     }, message.context)
-
-    message._metadata = Object.assign({
-      nodeVersion: process.versions.node
-    }, message._metadata)
+    // TODO
+    message.context = this._convert_dict_to_filum_event_format(message.context)
+    // message._metadata = Object.assign({
+    //   nodeVersion: process.versions.node
+    // }, message._metadata)
 
     if (!message.timestamp) {
       message.timestamp = new Date()
     }
-
-    if (!message.messageId) {
+    if (!message.original_timestamp) {
+      message.original_timestamp = new Date()
+    }
+    if (!message.sent_at) {
+      message.sent_at = new Date()
+    }
+    if (!message.received_at) {
+      message.received_at = new Date()
+    }
+    
+    // TODO
+    if (!message.event_id) {
       // We md5 the messaage to add more randomness. This is primarily meant
       // for use in the browser where the uuid package falls back to Math.random()
       // which is not a great source of randomness.
       // Borrowed from analytics.js (https://github.com/segment-integrations/analytics.js-integration-segmentio/blob/a20d2a2d222aeb3ab2a8c7e72280f1df2618440e/lib/index.js#L255-L256).
-      message.messageId = `node-${md5(JSON.stringify(message))}-${uuid()}`
+      message.event_id = `node-${md5(JSON.stringify(message))}-${uuid()}`
     }
 
+    // TODO
     // Historically this library has accepted strings and numbers as IDs.
     // However, our spec only allows strings. To avoid breaking compatibility,
     // we'll coerce these to strings if they aren't already.
-    if (message.anonymousId && !isString(message.anonymousId)) {
-      message.anonymousId = JSON.stringify(message.anonymousId)
+    if (!message.anonymous_id) {
+      message.anonymous_id = ''
     }
-    if (message.userId && !isString(message.userId)) {
-      message.userId = JSON.stringify(message.userId)
+    if (message.anonymous_id && !isString(message.anonymous_id)) {
+      message.anonymous_id = JSON.stringify(message.anonymous_id)
+    }
+    if (message.user_id && !isString(message.user_id)) {
+      message.user_id = JSON.stringify(message.user_id)
     }
 
+    // TODO
+    if (!message.origin) {
+      message.origin = ''
+    }
+
+    // TODO
+    if (message.event_params) {
+      message.event_params = this._convert_dict_to_filum_event_format(message.event_params)
+    }
     this.queue.push({ message, callback })
 
     if (!this.flushed) {
@@ -244,12 +271,13 @@ class Analytics {
     const callbacks = items.map(item => item.callback)
     const messages = items.map(item => item.message)
 
-    const data = {
-      batch: messages,
-      timestamp: new Date(),
-      sentAt: new Date()
-    }
-
+    // TODO
+    // const data = {
+    //   batch: messages,
+    //   timestamp: new Date(),
+    //   sentAt: new Date()
+    // }
+    const data = messages
     const done = err => {
       callbacks.forEach(callback => callback(err))
       callback(err, data)
@@ -259,15 +287,15 @@ class Analytics {
     // the User-Agent header (see https://fetch.spec.whatwg.org/#terminology-headers
     // and https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/setRequestHeader),
     // but browsers such as Chrome and Safari have not caught up.
+    // TODO
     const headers = {}
     if (typeof window === 'undefined') {
-      headers['user-agent'] = `analytics-node/${version}`
+      headers['user-agent'] = `filum-node-sdk/${version}`,
+      headers['Content-Type'] = 'application/json',
+      headers['Authorization'] = 'Bearer ' + this.writeKey
     }
 
     const req = {
-      auth: {
-        username: this.writeKey
-      },
       headers
     }
 
@@ -309,6 +337,27 @@ class Analytics {
     }
 
     return false
+  }
+
+  _convert_dict_to_filum_event_format(event_params) {
+    var event_params_server_format = []
+    for (const [k, v] of Object.entries(event_params)) {
+      var new_item = {}
+      new_item.key = k
+      new_item.value = {}
+      var value_type = typeof v
+      if (value_type === 'number'){
+        new_item.value.double_value = v
+      }
+      else if (value_type === 'bigint'){
+        new_item.value.datetime_value = v
+      }
+      else{
+        new_item.value.string_value = JSON.stringify(v)
+      }
+      event_params_server_format.push(new_item)
+    }   
+    return event_params_server_format
   }
 }
 
