@@ -353,7 +353,7 @@ class Analytics {
         new_item.value.datetime_value = v
       }
       else{
-        new_item.value.string_value = JSON.stringify(v)
+        new_item.value.string_value = String(v)
       }
       event_params_server_format.push(new_item)
     }   
