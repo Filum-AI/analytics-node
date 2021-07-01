@@ -37,7 +37,7 @@ class Analytics {
 
     this.queue = []
     this.writeKey = writeKey
-    this.host = removeSlash(options.host || 'http://event.filum.ai')
+    this.host = removeSlash(options.host || 'https://event.filum.ai')
     this.path = removeSlash(options.path || '/events')
     let axiosInstance = options.axiosInstance
     if (axiosInstance == null) {
