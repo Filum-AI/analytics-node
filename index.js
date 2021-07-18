@@ -9,6 +9,7 @@ const axiosRetry = require('axios-retry')
 const ms = require('ms')
 const { v4: uuid } = require('uuid')
 const md5 = require('md5')
+const name = require('./package.json').name
 const version = require('./package.json').version
 const isString = require('lodash.isstring')
 
@@ -17,14 +18,14 @@ const noop = () => {}
 
 class Analytics {
   /**
-   * Initialize a new `Analytics` with your Segment project's `writeKey` and an
+   * Initialize a new `Analytics` with your Filum project's `writeKey` and an
    * optional dictionary of `options`.
    *
    * @param {String} writeKey
    * @param {Object} [options] (optional)
    *   @property {Number} [flushAt] (default: 20)
    *   @property {Number} [flushInterval] (default: 10000)
-   *   @property {String} [host] (default: 'http://event-api.filum.ml')
+   *   @property {String} [host] (default: 'https://event.filum.ai')
    *   @property {Boolean} [enable] (default: true)
    *   @property {Object} [axiosConfig] (optional)
    *   @property {Object} [axiosInstance] (default: axios.create(options.axiosConfig))
@@ -33,7 +34,7 @@ class Analytics {
   constructor (writeKey, options) {
     options = options || {}
 
-    assert(writeKey, 'You must pass your Segment project\'s write key.')
+    assert(writeKey, 'You must pass your Filum project\'s write key.')
 
     this.queue = []
     this.writeKey = writeKey
@@ -61,10 +62,10 @@ class Analytics {
     })
   }
 
-  _validate (message, type) {
+  // _validate (message, type) {
     // TODO
     // looselyValidate(message, type)
-  }
+  // }
 
   /**
    * Send an identify `message`.
@@ -75,7 +76,7 @@ class Analytics {
    */
 
   identify (message, callback) {
-    this._validate(message, 'identify')
+    // this._validate(message, 'identify')
     message.event_name = 'Identify'
     this.enqueue('identify', message, callback)
     return this
@@ -90,7 +91,7 @@ class Analytics {
    */
 
   group (message, callback) {
-    this._validate(message, 'group')
+    // this._validate(message, 'group')
     this.enqueue('group', message, callback)
     return this
   }
@@ -104,7 +105,7 @@ class Analytics {
    */
 
   track (message, callback) {
-    this._validate(message, 'track')
+    // this._validate(message, 'track')
     this.enqueue('track', message, callback)
     return this
   }
@@ -118,7 +119,7 @@ class Analytics {
    */
 
   page (message, callback) {
-    this._validate(message, 'page')
+    // this._validate(message, 'page')
     this.enqueue('page', message, callback)
     return this
   }
@@ -132,7 +133,7 @@ class Analytics {
    */
 
   screen (message, callback) {
-    this._validate(message, 'screen')
+    // this._validate(message, 'screen')
     this.enqueue('screen', message, callback)
     return this
   }
@@ -146,7 +147,7 @@ class Analytics {
    */
 
   alias (message, callback) {
-    this._validate(message, 'alias')
+    // this._validate(message, 'alias')
     this.enqueue('alias', message, callback)
     return this
   }
@@ -170,17 +171,9 @@ class Analytics {
 
     message = Object.assign({}, message)
     message.event_type = type
-    message.context = Object.assign({
-      library: {
-        name: 'filum-node-sdk',
-        version
-      }
-    }, message.context)
+    
     // TODO
-    message.context = this._convert_dict_to_filum_event_format(message.context)
-    // message._metadata = Object.assign({
-    //   nodeVersion: process.versions.node
-    // }, message._metadata)
+    message.context = this._process_context_data(message.context)
 
     if (!message.timestamp) {
       message.timestamp = new Date()
@@ -225,7 +218,7 @@ class Analytics {
 
     // TODO
     if (message.event_params) {
-      message.event_params = this._convert_dict_to_filum_event_format(message.event_params)
+      message.event_params = this._convert_to_list_of_filum_item(message.event_params);
     }
     this.queue.push({ message, callback })
 
@@ -339,25 +332,70 @@ class Analytics {
     return false
   }
 
-  _convert_dict_to_filum_event_format(event_params) {
+  _convert_to_list_of_filum_item(event_params) {
     var event_params_server_format = []
-    for (const [k, v] of Object.entries(event_params)) {
-      var new_item = {}
-      new_item.key = k
-      new_item.value = {}
-      var value_type = typeof v
-      if (value_type === 'number'){
-        new_item.value.double_value = v
+    for (const [ k, v ] of Object.entries(event_params)) {
+      const new_item = this._convert_item(k, v);
+      event_params_server_format.push(new_item);
+    }
+    return event_params_server_format;
+  }
+
+  _convert_item(k, v) {
+    var new_item = {};
+    new_item.key = k;
+    new_item.value = {};
+    if (typeof v === "number") {
+      if (Number.isInteger(v)) {
+        new_item.value.int_value = v;
+      } else if (this._isFloat(v)) {
+        new_item.value.double_value = v;
       }
-      else if (value_type === 'bigint'){
-        new_item.value.datetime_value = v
-      }
-      else{
-        new_item.value.string_value = String(v)
-      }
-      event_params_server_format.push(new_item)
-    }   
-    return event_params_server_format
+    } else if (typeof v === 'string') {
+      new_item.value.string_value = v;
+    } else if (typeof v === 'boolean') {
+      new_item.value.int_value = v ? 1 : 0;
+    } else if (!v) {
+      new_item.value.string_value = null;
+    }
+    else {
+      new_item.value.string_value = JSON.stringify(v);
+    }
+    return new_item
+  }
+
+  _convert_to_dict_of_filum_item(dict_object) {
+    var filum_dict = {};
+    for (const [ k, v ] of Object.entries(dict_object)) {
+      const new_item = this._convert_item(k, v);
+      filum_dict[new_item.key] = new_item.value;
+    }
+    return filum_dict;
+  }
+
+  _isFloat(n){
+    return Number(n) === n && n % 1 !== 0;
+  }
+
+  _process_context_data() {
+    var _context = {}
+    _context.active = 0
+    _context.app = {}
+    _context.campaign = {}
+    _context.device = {}
+    _context.ip = ''
+    _context.library = {}
+    _context.library.name = name
+    _context.library.version = version
+    _context.locale = 'vi-VN'
+    _context.location = {}
+    _context.network = {}
+    _context.os = {}
+    _context.page = {}
+    _context.referrer = {}
+    _context.screen = {}
+    _context.user_agent = ''
+    return _context
   }
 }
 
