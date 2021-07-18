@@ -1,6 +1,6 @@
 {
   "name": "filum-node-sdk",
-  "version": "0.0.4",
+  "version": "v0.1.0",
   "description": "The hassle-free way to integrate analytics into any Node.js application",
   "license": "MIT",
   "repository": "Filum-AI/analytics-node",
