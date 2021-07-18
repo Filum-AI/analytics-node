@@ -88,7 +88,7 @@ test('expose a constructor', t => {
 })
 
 test('require a write key', t => {
-  t.throws(() => new Analytics(), 'You must pass your Segment project\'s write key.')
+  t.throws(() => new Analytics(), 'You must pass your Filum project\'s write key.')
 })
 
 test('create a queue', t => {
@@ -101,7 +101,7 @@ test('default options', t => {
   const client = new Analytics('key')
 
   t.is(client.writeKey, 'key')
-  t.is(client.host, 'https://api.segment.io')
+  t.is(client.host, 'https://event.filum.ai')
   t.is(client.flushAt, 20)
   t.is(client.flushInterval, 10000)
 })
